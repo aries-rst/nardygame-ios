@@ -1,0 +1,35 @@
+name: NardyGame
+options:
+  bundleIdPrefix: com.aries-rst
+  deploymentTarget:
+    iOS: "16.0"
+settings:
+  base:
+    DEVELOPMENT_TEAM: UWM7LPNBH6
+    CURRENT_PROJECT_VERSION: "1"
+    MARKETING_VERSION: "1.0"
+targets:
+  NardyGame:
+    type: application
+    platform: iOS
+    sources:
+      - NardyGame
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.aries-rst.nardygame.app
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        TARGETED_DEVICE_FAMILY: "1,2"
+    info:
+      path: NardyGame/Info.plist
+      properties:
+        CFBundleDisplayName: Silk Road Backgammon
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
