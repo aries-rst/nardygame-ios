@@ -1,9 +1,28 @@
 import SwiftUI
 
+struct DealPayload: Codable {
+    var whitePoints: [Int]
+    var blackPoints: [Int]
+    var whiteBorneOff: Int
+    var blackBorneOff: Int
+    var turn: NardyColor
+    var dice: [Int]
+    var lastRoll: [Int]
+    var winner: NardyColor?
+}
+
+struct NetMessage: Codable {
+    var moveRelative: Int? = nil
+    var deal: DealPayload? = nil
+}
+
 struct GameView: View {
     @ObservedObject var store: StoreManager
     @StateObject private var engine = NardyEngine()
     @Environment(\.dismiss) private var dismiss
+
+    var multiplayer: MultiplayerManager? = nil
+    var localColor: NardyColor = .white
 
     private let night = Color(red: 0.05, green: 0.16, blue: 0.20)
     private let gold = Color(red: 0.85, green: 0.62, blue: 0.22)
@@ -30,12 +49,15 @@ struct GameView: View {
         .onChange(of: engine.turn) { _ in
             botTurnIfNeeded()
         }
-        .onAppear { botTurnIfNeeded() }
+        .onAppear {
+            setupMultiplayerReceiver()
+            botTurnIfNeeded()
+        }
         .alert("Игра окончена", isPresented: Binding(get: { engine.winner != nil }, set: { _ in })) {
-            Button("Новая игра") { engine.reset() }
+            Button("Новая игра") { resetGame() }
             Button("В меню") { dismiss() }
         } message: {
-            Text(engine.winner == .white ? "Вы победили!" : "Бот победил!")
+            Text(alertMessage)
         }
     }
 
@@ -44,7 +66,7 @@ struct GameView: View {
             Text("Белые вне: \(engine.borneOff[.white] ?? 0)/15")
                 .foregroundStyle(sand)
             Spacer()
-            Text(engine.turn == .white ? "Ваш ход" : "Ход бота")
+            Text(headerTurnText)
                 .font(.headline)
                 .foregroundStyle(gold)
             Spacer()
@@ -53,6 +75,21 @@ struct GameView: View {
         }
         .font(.caption)
         .padding(.horizontal, 16)
+    }
+
+    private var headerTurnText: String {
+        if multiplayer != nil {
+            return engine.turn == localColor ? "Ваш ход" : "Ход соперника"
+        }
+        return engine.turn == .white ? "Ваш ход" : "Ход бота"
+    }
+
+    private var alertMessage: String {
+        guard let winner = engine.winner else { return "" }
+        if multiplayer != nil {
+            return winner == localColor ? "Вы победили!" : "Соперник победил!"
+        }
+        return winner == .white ? "Вы победили!" : "Бот победил!"
     }
 
     private var diceView: some View {
@@ -89,7 +126,9 @@ struct GameView: View {
         let whiteCount = engine.count(for: .white, at: physical)
         let blackRelative = (physical + 12) % 24
         let blackCount = engine.count(for: .black, at: blackRelative)
-        let isMovable = engine.turn == .white && engine.movablePoints(for: .white).contains(physical)
+        let activeColor: NardyColor = multiplayer != nil ? localColor : .white
+        let activeRelative = activeColor == .white ? physical : blackRelative
+        let isMovable = engine.turn == activeColor && engine.movablePoints(for: activeColor).contains(activeRelative)
         let isSelected = engine.selectedPoint == physical
 
         return VStack(spacing: 2) {
@@ -116,7 +155,7 @@ struct GameView: View {
         .clipShape(RoundedRectangle(cornerRadius: 6))
         .onTapGesture {
             guard isMovable else { return }
-            engine.moveFrom(physical)
+            handleTap(activeRelative)
         }
     }
 
@@ -132,13 +171,19 @@ struct GameView: View {
 
     private var footer: some View {
         HStack(spacing: 16) {
-            Button {
-                engine.reset()
-            } label: {
-                Label("Новая игра", systemImage: "arrow.counterclockwise")
+            if multiplayer == nil || localColor == .white {
+                Button {
+                    resetGame()
+                } label: {
+                    Label("Новая игра", systemImage: "arrow.counterclockwise")
+                }
             }
             Spacer()
-            if !store.isPremium {
+            if let mp = multiplayer {
+                Text(multiplayerStatusText(mp))
+                    .font(.caption)
+                    .foregroundStyle(sand.opacity(0.6))
+            } else if !store.isPremium {
                 Text("Реклама в бесплатной версии")
                     .font(.caption)
                     .foregroundStyle(sand.opacity(0.5))
@@ -148,10 +193,87 @@ struct GameView: View {
         .padding(.horizontal, 18)
     }
 
+    private func multiplayerStatusText(_ mp: MultiplayerManager) -> String {
+        if case .connected(let name) = mp.state {
+            return "Подключено: \(name)"
+        }
+        return "Соединение прервано"
+    }
+
+    private func handleTap(_ relative: Int) {
+        guard multiplayer != nil else {
+            engine.moveFrom(relative)
+            return
+        }
+        if localColor == .white {
+            engine.humanMove(relative, color: .white)
+            sendCurrentDeal()
+        } else {
+            multiplayer?.send(NetMessage(moveRelative: relative))
+        }
+    }
+
     private func botTurnIfNeeded() {
+        guard multiplayer == nil else { return }
         guard engine.turn == .black, engine.winner == nil else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             engine.playBotTurnIfNeeded()
+        }
+    }
+
+    private func resetGame() {
+        if multiplayer != nil {
+            guard localColor == .white else { return }
+            engine.reset()
+            sendCurrentDeal()
+        } else {
+            engine.reset()
+        }
+    }
+
+    private func sendCurrentDeal() {
+        let deal = DealPayload(
+            whitePoints: engine.points[.white] ?? [],
+            blackPoints: engine.points[.black] ?? [],
+            whiteBorneOff: engine.borneOff[.white] ?? 0,
+            blackBorneOff: engine.borneOff[.black] ?? 0,
+            turn: engine.turn,
+            dice: engine.dice,
+            lastRoll: engine.lastRoll,
+            winner: engine.winner
+        )
+        multiplayer?.send(NetMessage(deal: deal))
+    }
+
+    private func setupMultiplayerReceiver() {
+        guard let mp = multiplayer else { return }
+        if localColor == .white {
+            // Host already rolled the real opening dice in engine's init(); broadcast
+            // it so the guest mirrors the exact same board/turn/dice instead of
+            // generating its own random roll.
+            sendCurrentDeal()
+        }
+        mp.onReceive = { data in
+            guard let msg = try? JSONDecoder().decode(NetMessage.self, from: data) else { return }
+            DispatchQueue.main.async {
+                if let deal = msg.deal {
+                    engine.applyDeal(
+                        whitePoints: deal.whitePoints,
+                        blackPoints: deal.blackPoints,
+                        whiteBorneOff: deal.whiteBorneOff,
+                        blackBorneOff: deal.blackBorneOff,
+                        turn: deal.turn,
+                        dice: deal.dice,
+                        lastRoll: deal.lastRoll,
+                        winner: deal.winner
+                    )
+                } else if let relative = msg.moveRelative, localColor == .white {
+                    // Host applies a move request from the guest (always black),
+                    // then rebroadcasts the resulting authoritative state.
+                    engine.humanMove(relative, color: .black)
+                    sendCurrentDeal()
+                }
+            }
         }
     }
 }
