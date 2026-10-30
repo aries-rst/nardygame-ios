@@ -15,7 +15,7 @@ final class NardyEngine: ObservableObject {
     static let checkersPerPlayer = 15
     static let homeStart = 18 // relative index where a player's home board begins
 
-    @Published var points: [NardyColor: [Int]] = [:]   // relative index 0...23 -> checker count
+    @Published var points: [NardyColor: [Int]] = [:] // relative index 0...23 -> checker count
     @Published var borneOff: [NardyColor: Int] = [.white: 0, .black: 0]
     @Published var turn: NardyColor = .white
     @Published var dice: [Int] = []
@@ -122,6 +122,22 @@ final class NardyEngine: ObservableObject {
         apply(chosen, color: .white)
     }
 
+    /// Multiplayer: lets either color make the human move choice at `relative`,
+    /// using the same tie-break heuristic as `moveFrom` (prefers an exact bear-off,
+    /// otherwise the smallest usable die). `moveFrom` is hardcoded to `.white`
+    /// because single-player always casts the local human as white; this version
+    /// is used so a multiplayer guest playing black can move too.
+    func humanMove(_ relative: Int, color: NardyColor) {
+        guard turn == color, winner == nil else { return }
+        let candidates = legalMoves(for: color).filter { $0.from == relative }
+        guard !candidates.isEmpty else { return }
+        let chosen = candidates.sorted { a, b in
+            if a.isBearOff != b.isBearOff { return a.isBearOff }
+            return a.die < b.die
+        }.first!
+        apply(chosen, color: color)
+    }
+
     func apply(_ move: NardyMove, color: NardyColor) {
         guard var pts = points[color], pts[move.from] > 0 else { return }
         pts[move.from] -= 1
@@ -154,6 +170,24 @@ final class NardyEngine: ObservableObject {
 
     func count(for color: NardyColor, at relative: Int) -> Int {
         points[color]?[relative] ?? 0
+    }
+
+    // MARK: - Multiplayer sync
+
+    /// Replaces the current state wholesale with one received from the host, so a
+    /// multiplayer guest mirrors the host's authoritative (and already-random)
+    /// dice rolls instead of generating its own. The host device runs the real
+    /// `reset()`/`apply()`/`rollDice()` logic exactly as in single-player and
+    /// broadcasts the result after every change; the guest's own engine instance
+    /// never calls those random-dice methods itself.
+    func applyDeal(whitePoints: [Int], blackPoints: [Int], whiteBorneOff: Int, blackBorneOff: Int, turn: NardyColor, dice: [Int], lastRoll: [Int], winner: NardyColor?) {
+        points = [.white: whitePoints, .black: blackPoints]
+        borneOff = [.white: whiteBorneOff, .black: blackBorneOff]
+        self.turn = turn
+        self.dice = dice
+        self.lastRoll = lastRoll
+        self.winner = winner
+        selectedPoint = nil
     }
 }
 
