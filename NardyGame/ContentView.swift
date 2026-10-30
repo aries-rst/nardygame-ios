@@ -55,13 +55,15 @@ struct ContentView: View {
                     }
                     .padding(.horizontal, 32)
 
+                    CrossPromoSection(accent: gold, textColor: sand, cardFill: turquoise.opacity(0.18))
+
                     Spacer()
 
                     Text(store.isPremium ? "Реклама отключена · Локальный мультиплеер открыт" : "Бесплатная версия · с рекламой")
                         .font(.footnote)
                         .foregroundStyle(sand.opacity(0.6))
                         .padding(.bottom, 24)
-                }
+            }
             }
             .navigationDestination(isPresented: $showGame) {
                 GameView(store: store)
