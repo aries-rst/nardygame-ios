@@ -18,6 +18,7 @@ struct NetMessage: Codable {
 
 struct GameView: View {
     @ObservedObject var store: StoreManager
+    @ObservedObject private var lang = AppLang.shared
     @StateObject private var engine = NardyEngine()
     @Environment(\.dismiss) private var dismiss
 
@@ -53,9 +54,9 @@ struct GameView: View {
             setupMultiplayerReceiver()
             botTurnIfNeeded()
         }
-        .alert("Игра окончена", isPresented: Binding(get: { engine.winner != nil }, set: { _ in })) {
-            Button("Новая игра") { resetGame() }
-            Button("В меню") { dismiss() }
+        .alert(t("Game Over", "Игра окончена"), isPresented: Binding(get: { engine.winner != nil }, set: { _ in })) {
+            Button(t("New Game", "Новая игра")) { resetGame() }
+            Button(t("To Menu", "В меню")) { dismiss() }
         } message: {
             Text(alertMessage)
         }
@@ -63,14 +64,14 @@ struct GameView: View {
 
     private var header: some View {
         HStack {
-            Text("Белые вне: \(engine.borneOff[.white] ?? 0)/15")
+            Text(t("White off: \(engine.borneOff[.white] ?? 0)/15", "Белые вне: \(engine.borneOff[.white] ?? 0)/15"))
                 .foregroundStyle(sand)
             Spacer()
             Text(headerTurnText)
                 .font(.headline)
                 .foregroundStyle(gold)
             Spacer()
-            Text("Чёрные вне: \(engine.borneOff[.black] ?? 0)/15")
+            Text(t("Black off: \(engine.borneOff[.black] ?? 0)/15", "Чёрные вне: \(engine.borneOff[.black] ?? 0)/15"))
                 .foregroundStyle(sand)
         }
         .font(.caption)
@@ -79,17 +80,17 @@ struct GameView: View {
 
     private var headerTurnText: String {
         if multiplayer != nil {
-            return engine.turn == localColor ? "Ваш ход" : "Ход соперника"
+            return engine.turn == localColor ? t("Your turn", "Ваш ход") : t("Opponent's turn", "Ход соперника")
         }
-        return engine.turn == .white ? "Ваш ход" : "Ход бота"
+        return engine.turn == .white ? t("Your turn", "Ваш ход") : t("Bot's turn", "Ход бота")
     }
 
     private var alertMessage: String {
         guard let winner = engine.winner else { return "" }
         if multiplayer != nil {
-            return winner == localColor ? "Вы победили!" : "Соперник победил!"
+            return winner == localColor ? t("You won!", "Вы победили!") : t("Opponent won!", "Соперник победил!")
         }
-        return winner == .white ? "Вы победили!" : "Бот победил!"
+        return winner == .white ? t("You won!", "Вы победили!") : t("Bot won!", "Бот победил!")
     }
 
     private var diceView: some View {
@@ -175,7 +176,7 @@ struct GameView: View {
                 Button {
                     resetGame()
                 } label: {
-                    Label("Новая игра", systemImage: "arrow.counterclockwise")
+                    Label(t("New Game", "Новая игра"), systemImage: "arrow.counterclockwise")
                 }
             }
             Spacer()
@@ -184,7 +185,7 @@ struct GameView: View {
                     .font(.caption)
                     .foregroundStyle(sand.opacity(0.6))
             } else if !store.isPremium {
-                Text("Реклама в бесплатной версии")
+                Text(t("Ads shown in free version", "Реклама в бесплатной версии"))
                     .font(.caption)
                     .foregroundStyle(sand.opacity(0.5))
             }
@@ -195,9 +196,9 @@ struct GameView: View {
 
     private func multiplayerStatusText(_ mp: MultiplayerManager) -> String {
         if case .connected(let name) = mp.state {
-            return "Подключено: \(name)"
+            return t("Connected: \(name)", "Подключено: \(name)")
         }
-        return "Соединение прервано"
+        return t("Connection lost", "Соединение прервано")
     }
 
     private func handleTap(_ relative: Int) {
@@ -280,6 +281,7 @@ struct GameView: View {
 
 struct PremiumView: View {
     @ObservedObject var store: StoreManager
+    @ObservedObject private var lang = AppLang.shared
     @Environment(\.dismiss) private var dismiss
 
     private let gold = Color(red: 0.85, green: 0.62, blue: 0.22)
@@ -296,20 +298,20 @@ struct PremiumView: View {
                     .font(.title2.bold())
 
                 VStack(alignment: .leading, spacing: 12) {
-                    featureRow("Без рекламы")
-                    featureRow("Локальный мультиплеер по Wi-Fi/Bluetooth")
-                    featureRow("Разовая покупка — навсегда")
+                    featureRow(t("No ads", "Без рекламы"))
+                    featureRow(t("Local multiplayer over Wi-Fi/Bluetooth", "Локальный мультиплеер по Wi-Fi/Bluetooth"))
+                    featureRow(t("One-time purchase — yours forever", "Разовая покупка — навсегда"))
                 }
                 .padding(.horizontal, 24)
 
                 if store.isPremium {
-                    Label("Premium уже активен", systemImage: "checkmark.seal.fill")
+                    Label(t("Premium already active", "Premium уже активен"), systemImage: "checkmark.seal.fill")
                         .foregroundStyle(.green)
                 } else {
                     Button {
                         Task { await store.purchasePremium() }
                     } label: {
-                        Text("Купить за \(store.priceText)")
+                        Text(t("Buy for \(store.priceText)", "Купить за \(store.priceText)"))
                             .fontWeight(.bold)
                             .frame(maxWidth: .infinity)
                             .padding()
@@ -319,7 +321,7 @@ struct PremiumView: View {
                     }
                     .padding(.horizontal, 24)
 
-                    Button("Восстановить покупки") {
+                    Button(t("Restore Purchases", "Восстановить покупки")) {
                         Task { await store.restorePurchases() }
                     }
                     .font(.footnote)
@@ -333,7 +335,7 @@ struct PremiumView: View {
             }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Закрыть") { dismiss() }
+                    Button(t("Close", "Закрыть")) { dismiss() }
                 }
             }
         }

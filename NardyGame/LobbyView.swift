@@ -3,6 +3,7 @@ import MultipeerConnectivity
 
 struct MultiplayerLobbyView: View {
     @ObservedObject var store: StoreManager
+    @ObservedObject private var lang = AppLang.shared
     @StateObject private var multiplayer = MultiplayerManager(serviceType: "ar-nardy")
     @State private var myColor: NardyColor = .white
     @State private var startGame = false
@@ -22,7 +23,7 @@ struct MultiplayerLobbyView: View {
                         .foregroundStyle(gold)
                         .padding(.top, 20)
 
-                    Text("Игра по сети")
+                    Text(t("Play Online", "Игра по сети"))
                         .font(.title2.bold())
                         .foregroundStyle(sand)
 
@@ -38,13 +39,13 @@ struct MultiplayerLobbyView: View {
                                 myColor = .white
                                 multiplayer.startHosting()
                             } label: {
-                                lobbyButtonLabel("Создать игру", system: "antenna.radiowaves.left.and.right")
+                                lobbyButtonLabel(t("Create Game", "Создать игру"), system: "antenna.radiowaves.left.and.right")
                             }
                             Button {
                                 myColor = .black
                                 multiplayer.startBrowsing()
                             } label: {
-                                lobbyButtonLabel("Найти игру рядом", system: "magnifyingglass")
+                                lobbyButtonLabel(t("Find Nearby Game", "Найти игру рядом"), system: "magnifyingglass")
                             }
                         }
                         .padding(.horizontal, 32)
@@ -59,7 +60,7 @@ struct MultiplayerLobbyView: View {
                                     Image(systemName: "iphone")
                                     Text(peer.displayName)
                                     Spacer()
-                                    Text("Пригласить").font(.caption)
+                                    Text(t("Invite", "Пригласить")).font(.caption)
                                 }
                             }
                         }
@@ -69,7 +70,7 @@ struct MultiplayerLobbyView: View {
                     }
 
                     if multiplayer.role != .none {
-                        Button("Отмена") {
+                        Button(t("Cancel", "Отмена")) {
                             multiplayer.stop()
                         }
                         .font(.footnote)
@@ -86,7 +87,7 @@ struct MultiplayerLobbyView: View {
             }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Закрыть") {
+                    Button(t("Close", "Закрыть")) {
                         multiplayer.stop()
                         dismiss()
                     }
@@ -124,15 +125,15 @@ struct MultiplayerLobbyView: View {
     private var statusText: String {
         switch multiplayer.state {
         case .idle:
-            return "Создайте игру, чтобы вас нашёл соперник рядом, либо найдите уже созданную игру. Нужны Wi-Fi или Bluetooth."
+            return t("Create a game so a nearby opponent can find you, or find a game that's already been created. Wi-Fi or Bluetooth required.", "Создайте игру, чтобы вас нашёл соперник рядом, либо найдите уже созданную игру. Нужны Wi-Fi или Bluetooth.")
         case .hosting:
-            return "Ожидание соперника… Другой игрок должен открыть эту игру и нажать «Найти игру рядом»."
+            return t("Waiting for opponent… The other player should open this game and tap \"Find Nearby Game\".", "Ожидание соперника… Другой игрок должен открыть эту игру и нажать «Найти игру рядом».")
         case .browsing:
-            return multiplayer.availablePeers.isEmpty ? "Поиск игр рядом…" : "Выберите игру из списка."
+            return multiplayer.availablePeers.isEmpty ? t("Searching for nearby games…", "Поиск игр рядом…") : t("Choose a game from the list.", "Выберите игру из списка.")
         case .connecting:
-            return "Подключение…"
+            return t("Connecting…", "Подключение…")
         case .connected(let name):
-            return "Подключено к \(name). Начинаем игру…"
+            return t("Connected to \(name). Starting game…", "Подключено к \(name). Начинаем игру…")
         }
     }
 }
