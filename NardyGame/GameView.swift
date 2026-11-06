@@ -447,8 +447,10 @@ final class NardyGameController: ObservableObject {
 struct GameView: View {
     @ObservedObject var store: StoreManager
     @ObservedObject private var lang = AppLang.shared
+    @ObservedObject private var boardTheme = NardyBoardTheme.shared
     @StateObject private var controller: NardyGameController
     @Environment(\.dismiss) private var dismiss
+    @State private var showThemePicker = false
 
     private let localSeat: Int
 
@@ -458,8 +460,6 @@ struct GameView: View {
     private let sand = Color(red: 0.95, green: 0.90, blue: 0.78)
     private let boardDark = Color(red: 0.10, green: 0.26, blue: 0.27)
     private let boardLight = Color(red: 0.15, green: 0.35, blue: 0.35)
-
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: 3), count: 6)
 
     init(store: StoreManager, variant: NVariant, botLevel: Int, multiplayer: MultiplayerManager? = nil, localSeat: Int = 0) {
         self.store = store
@@ -501,6 +501,9 @@ struct GameView: View {
             Button(t("To Menu", "В меню")) { dismiss() }
         } message: {
             Text(alertMessage)
+        }
+        .sheet(isPresented: $showThemePicker) {
+            NardyThemePickerView()
         }
     }
 
@@ -645,43 +648,27 @@ struct GameView: View {
     private var movableInfo: (points: Set<Int>, bar: Bool) { controller.movable(seat: mySeat) }
 
     private var boardView: some View {
-        let movable = movableInfo
-        return LazyVGrid(columns: columns, spacing: 3) {
-            ForEach(0..<24, id: \.self) { physical in
-                pointCell(physical, movable: movable.points)
-            }
-        }
-        .padding(8)
+        NardyBoardCanvas(
+            snapshot: controller.boardSnapshot,
+            theme: boardTheme.id,
+            onTapPoint: { physical in controller.tapPoint(physical, seat: mySeat) },
+            onTapBar: { controller.tapPoint(-1, seat: mySeat) }
+        )
+        .aspectRatio(NardyBoardGeo.W / NardyBoardGeo.H, contentMode: .fit)
         .background(boardDark.opacity(0.6))
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(gold.opacity(0.4), lineWidth: 1))
-    }
-
-    private func pointCell(_ physical: Int, movable: Set<Int>) -> some View {
-        let v = controller.variant
-        let whiteOwn = NEngine.pathOf(v, 0, physical)
-        let blackOwn = NEngine.pathOf(v, 1, physical)
-        let whiteCount = controller.state.pos[0][whiteOwn]
-        let blackCount = controller.state.pos[1][blackOwn]
-        let whitePinned = controller.state.pin[0][whiteOwn] != 0
-        let blackPinned = controller.state.pin[1][blackOwn] != 0
-        let isMovable = movable.contains(physical) && controller.state.turn == mySeat
-        return VStack(spacing: 2) {
-            Text("\(physical + 1)")
-                .font(.system(size: 9))
-                .foregroundStyle(sand.opacity(0.4))
-            if whiteCount > 0 { checkerBadge(count: whiteCount, color: sand, pinned: whitePinned) }
-            if blackCount > 0 { checkerBadge(count: blackCount, color: Color(white: 0.2), pinned: blackPinned) }
-            if whiteCount == 0 && blackCount == 0 { Spacer().frame(height: 22) }
-        }
-        .frame(maxWidth: .infinity, minHeight: 58)
-        .padding(.vertical, 4)
-        .background((physical / 6) % 2 == 0 ? boardDark : boardLight)
-        .overlay(RoundedRectangle(cornerRadius: 6).stroke(isMovable ? turquoise : .clear, lineWidth: 2))
-        .clipShape(RoundedRectangle(cornerRadius: 6))
-        .onTapGesture {
-            guard isMovable else { return }
-            controller.tapPoint(physical, seat: mySeat)
+        .overlay(alignment: .topTrailing) {
+            Button {
+                showThemePicker = true
+            } label: {
+                Image(systemName: "paintpalette.fill")
+                    .font(.caption)
+                    .foregroundStyle(gold)
+                    .padding(8)
+                    .background(Circle().fill(night.opacity(0.7)))
+            }
+            .padding(6)
         }
     }
 
