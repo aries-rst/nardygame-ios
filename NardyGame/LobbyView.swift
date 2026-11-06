@@ -4,8 +4,9 @@ import MultipeerConnectivity
 struct MultiplayerLobbyView: View {
     @ObservedObject var store: StoreManager
     @ObservedObject private var lang = AppLang.shared
+    let variant: NVariant
     @StateObject private var multiplayer = MultiplayerManager(serviceType: "ar-nardy")
-    @State private var myColor: NardyColor = .white
+    @State private var mySeat: Int = 0 // 0 = white/host, 1 = black/guest
     @State private var startGame = false
     @State private var showHostSetup = false
     @State private var hostNickname: String = UIDevice.current.name
@@ -15,12 +16,7 @@ struct MultiplayerLobbyView: View {
     private let gold = Color(red: 0.85, green: 0.62, blue: 0.22)
     private let sand = Color(red: 0.95, green: 0.90, blue: 0.78)
 
-    /// NardyEngine currently implements only one ruleset (Long Nardy), so there is
-    /// no real choice to put in a Picker yet. We still broadcast it under the
-    /// "variant" key so the discovered-game card already shows real per-host
-    /// info, and so a future second ruleset only needs a Picker bound to this
-    /// same key — no MultiplayerManager/LobbyView plumbing changes.
-    private var currentVariantName: String { t("Long Nardy", "Длинные нарды") }
+    private var variantName: String { nardyVariantName(variant) }
 
     var body: some View {
         NavigationStack {
@@ -50,7 +46,7 @@ struct MultiplayerLobbyView: View {
                                 lobbyButtonLabel(t("Create Game", "Создать игру"), system: "antenna.radiowaves.left.and.right")
                             }
                             Button {
-                                myColor = .black
+                                mySeat = 1
                                 multiplayer.startBrowsing()
                             } label: {
                                 lobbyButtonLabel(t("Find Nearby Game", "Найти игру рядом"), system: "magnifyingglass")
@@ -93,7 +89,7 @@ struct MultiplayerLobbyView: View {
                 }
             }
             .navigationDestination(isPresented: $startGame) {
-                GameView(store: store, multiplayer: multiplayer, localColor: myColor)
+                GameView(store: store, variant: variant, botLevel: 1, multiplayer: multiplayer, localSeat: mySeat)
             }
             .onChange(of: multiplayer.state) { state in
                 if case .connected = state {
@@ -115,24 +111,20 @@ struct MultiplayerLobbyView: View {
                     .foregroundStyle(sand)
                     .padding(.vertical, 10)
                     .padding(.horizontal, 12)
-                    .background(
-                        RoundedRectangle(cornerRadius: 10).fill(Color.white.opacity(0.06))
-                    )
+                    .background(RoundedRectangle(cornerRadius: 10).fill(Color.white.opacity(0.06)))
 
                 Text(t("Rules", "Правила"))
                     .font(.caption)
                     .foregroundStyle(sand.opacity(0.6))
                     .padding(.top, 4)
                 HStack {
-                    Text(currentVariantName).foregroundStyle(sand)
+                    Text(variantName).foregroundStyle(sand)
                     Spacer()
                     Image(systemName: "checkmark.circle.fill").foregroundStyle(gold)
                 }
                 .padding(.vertical, 10)
                 .padding(.horizontal, 12)
-                .background(
-                    RoundedRectangle(cornerRadius: 10).fill(Color.white.opacity(0.06))
-                )
+                .background(RoundedRectangle(cornerRadius: 10).fill(Color.white.opacity(0.06)))
             }
             .padding(14)
             .background(
@@ -142,11 +134,11 @@ struct MultiplayerLobbyView: View {
             )
 
             Button {
-                myColor = .white
+                mySeat = 0
                 let nickname = hostNickname.trimmingCharacters(in: .whitespacesAndNewlines)
                 multiplayer.startHosting(info: [
                     "host": nickname.isEmpty ? UIDevice.current.name : nickname,
-                    "variant": currentVariantName
+                    "variant": variantName
                 ])
             } label: {
                 lobbyButtonLabel(t("Start Hosting", "Начать трансляцию"), system: "antenna.radiowaves.left.and.right")
@@ -172,7 +164,7 @@ struct MultiplayerLobbyView: View {
                 ForEach(multiplayer.availablePeers, id: \.self) { peer in
                     let info = multiplayer.discoveredGames[peer] ?? [:]
                     let hostName = info["host"]?.isEmpty == false ? info["host"]! : peer.displayName
-                    let variantName = info["variant"]?.isEmpty == false ? info["variant"]! : t("Long Nardy", "Длинные нарды")
+                    let variantLabel = info["variant"]?.isEmpty == false ? info["variant"]! : variantName
                     Button {
                         multiplayer.invite(peer)
                     } label: {
@@ -183,7 +175,7 @@ struct MultiplayerLobbyView: View {
                                 Text(hostName)
                                     .fontWeight(.semibold)
                                     .foregroundStyle(sand)
-                                Text(variantName)
+                                Text(variantLabel)
                                     .font(.caption)
                                     .foregroundStyle(sand.opacity(0.6))
                             }
@@ -198,11 +190,11 @@ struct MultiplayerLobbyView: View {
                             RoundedRectangle(cornerRadius: 14)
                                 .fill(Color.white.opacity(0.06))
                                 .overlay(RoundedRectangle(cornerRadius: 14).stroke(gold.opacity(0.5), lineWidth: 1))
-                    )
+                        )
+                    }
                 }
             }
-        }
-        .padding(.horizontal, 32)
+            .padding(.horizontal, 32)
         }
         .frame(maxHeight: 240)
     }
@@ -227,7 +219,7 @@ struct MultiplayerLobbyView: View {
     private var statusText: String {
         switch multiplayer.state {
         case .idle:
-            return t("Create a game so a nearby opponent can find you, or find a game that's already been created. Wi-Fi or Bluetooth required.", "Создайте игру, чтобы вас нашёл соперник ryadom, либо найдите уже созданную игру. Нужны Wi-Fi или Bluetooth.")
+            return t("Create a game so a nearby opponent can find you, or find a game that's already been created. Wi-Fi or Bluetooth required.", "Создайте игру, чтобы вас нашёл соперник рядом, либо найдите уже созданную игру. Нужны Wi-Fi или Bluetooth.")
         case .hosting:
             return t("Waiting for opponent… The other player should open this game and tap \"Find Nearby Game\".", "Ожидание соперника… Другой игрок должен открыть эту игру и нажать «Найти игру рядом».")
         case .browsing:
