@@ -132,7 +132,9 @@ final class NardyGameController: ObservableObject {
     }
 
     private func performRoll() {
-        state = NEngine.setDice(state, NEngine.fairDie(), NEngine.fairDie())
+        let a = NEngine.fairDie(); let b = NEngine.fairDie()
+        if multiplayer == nil { NardyStats.shared.recordRoll(isBot: false, a, b) }
+        state = NEngine.setDice(state, a, b)
         if NEngine.legalSteps(state).isEmpty {
             state = NEngine.endTurn(state)
             checkWinner()
@@ -148,8 +150,7 @@ final class NardyGameController: ObservableObject {
             state.cubeOwner = 1
             objectWillChange.send()
         } else {
-            winnerSeat = 0
-            winnerPoints = state.cube
+            endGameVsBot(winner: 0, points: state.cube)
         }
     }
 
@@ -162,9 +163,16 @@ final class NardyGameController: ObservableObject {
             objectWillChange.send()
             playBotTurn()
         } else {
-            winnerSeat = 1
-            winnerPoints = state.cube
+            endGameVsBot(winner: 1, points: state.cube)
         }
+    }
+
+    /// Records vs-bot stats once, from every path that can end such a game
+    /// (an engine win, or either side dropping a cube offer).
+    private func endGameVsBot(winner: Int, points: Int) {
+        winnerSeat = winner
+        winnerPoints = points
+        NardyStats.shared.recordResult(variant: variant, level: botLevel, won: winner == 0)
     }
 
     // MARK: - Doubling cube over network (both seats; only the host mutates
@@ -241,8 +249,13 @@ final class NardyGameController: ObservableObject {
     private func checkWinner() {
         let w = NEngine.winner(state)
         if w >= 0 {
-            winnerSeat = w
-            winnerPoints = NEngine.winScore(state, w) * state.cube
+            let points = NEngine.winScore(state, w) * state.cube
+            if multiplayer == nil {
+                endGameVsBot(winner: w, points: points)
+            } else {
+                winnerSeat = w
+                winnerPoints = points
+            }
         }
     }
 
@@ -261,7 +274,9 @@ final class NardyGameController: ObservableObject {
     }
 
     private func playBotTurn() {
-        state = NEngine.setDice(state, NEngine.fairDie(), NEngine.fairDie())
+        let a = NEngine.fairDie(); let b = NEngine.fairDie()
+        NardyStats.shared.recordRoll(isBot: true, a, b)
+        state = NEngine.setDice(state, a, b)
         let seq = NEngine.aiChoose(state, botLevel)
         if let last = seq.last { state = last.state }
         state = NEngine.endTurn(state)
