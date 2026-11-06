@@ -21,6 +21,10 @@ struct NStatePayload: Codable {
     var mother: Int
     var cube: Int
     var cubeOwner: Int
+    // Carried alongside the state so a win by cube-drop (not detectable from
+    // NGState alone) reaches the other device too.
+    var winnerSeat: Int? = nil
+    var winnerPoints: Int? = nil
 
     init(_ s: NGState) {
         variant = s.v
@@ -55,6 +59,11 @@ struct NNetMessage: Codable {
     var deal: NStatePayload? = nil
     var intent: NIntent? = nil
     var rollRequest: Bool? = nil
+    // Cube over network: the mover sends `cubeOffer`; since only the host
+    // mutates shared state, a guest's decision travels back as `cubeDecision`
+    // for the host to apply (see NardyGameController's network cube methods).
+    var cubeOffer: Bool? = nil
+    var cubeDecision: Bool? = nil
 }
 
 /// Drives one match for every variant (long/short/tavla/plakoto/fevga) against
@@ -63,6 +72,7 @@ struct NNetMessage: Codable {
 final class NardyGameController: ObservableObject {
     @Published var state: NGState
     @Published var cubeOfferPending = false // vs-bot only: bot offered, human must respond
+    @Published var incomingCubeOffer = false // network only: the opponent offered, this device's human must respond
     @Published var winnerSeat: Int? = nil
     @Published var winnerPoints: Int = 0
 
@@ -157,6 +167,43 @@ final class NardyGameController: ObservableObject {
         }
     }
 
+    // MARK: - Doubling cube over network (both seats; only the host mutates
+    // shared state, so a non-host's decision is relayed back for the host to apply)
+
+    func canOfferDoubleNetwork(seat: Int) -> Bool {
+        multiplayer != nil && state.turn == seat && NEngine.canOffer(state, seat, false)
+            && state.dice.isEmpty && winnerSeat == nil && !incomingCubeOffer
+    }
+
+    func offerDoubleNetwork(seat: Int) {
+        guard canOfferDoubleNetwork(seat: seat) else { return }
+        multiplayer?.send(NNetMessage(cubeOffer: true))
+    }
+
+    /// Called on whichever device is showing the "opponent offered to double" alert.
+    func respondToNetworkCubeOffer(accept: Bool) {
+        guard incomingCubeOffer else { return }
+        incomingCubeOffer = false
+        if localSeat == 0 {
+            applyCubeDecision(accept: accept, offererSeat: 1)
+        } else {
+            multiplayer?.send(NNetMessage(cubeDecision: accept))
+        }
+    }
+
+    /// Host-only: apply a cube accept/drop and broadcast the result.
+    private func applyCubeDecision(accept: Bool, offererSeat: Int) {
+        if accept {
+            state.cube *= 2
+            state.cubeOwner = 1 - offererSeat
+            objectWillChange.send()
+        } else {
+            winnerSeat = offererSeat
+            winnerPoints = state.cube
+        }
+        broadcast()
+    }
+
     // MARK: - Human move
 
     /// `physical` is a board point 0...23, or -1 to enter from the bar.
@@ -226,13 +273,19 @@ final class NardyGameController: ObservableObject {
         winnerSeat = nil
         winnerPoints = 0
         cubeOfferPending = false
+        incomingCubeOffer = false
         if multiplayer != nil && localSeat == 0 { broadcast() }
     }
 
     // MARK: - Networking plumbing
 
     private func broadcast() {
-        multiplayer?.send(NNetMessage(deal: NStatePayload(state)))
+        var payload = NStatePayload(state)
+        if let ws = winnerSeat {
+            payload.winnerSeat = ws
+            payload.winnerPoints = winnerPoints
+        }
+        multiplayer?.send(NNetMessage(deal: payload))
     }
 
     private func setupReceiver() {
@@ -242,11 +295,20 @@ final class NardyGameController: ObservableObject {
             DispatchQueue.main.async {
                 if let deal = msg.deal {
                     self.state = deal.toState()
-                    self.checkWinner()
+                    if let ws = deal.winnerSeat {
+                        self.winnerSeat = ws
+                        self.winnerPoints = deal.winnerPoints ?? 0
+                    } else {
+                        self.checkWinner()
+                    }
                 } else if let intent = msg.intent, self.localSeat == 0 {
                     self.hostApplyIntent(intent)
                 } else if msg.rollRequest == true, self.localSeat == 0 {
                     self.hostApplyRollRequest()
+                } else if msg.cubeOffer == true {
+                    self.incomingCubeOffer = true
+                } else if let decision = msg.cubeDecision, self.localSeat == 0 {
+                    self.applyCubeDecision(accept: decision, offererSeat: 0)
                 }
             }
         }
@@ -315,6 +377,12 @@ struct GameView: View {
         } message: {
             Text(t("The bot offers to double the stakes to \(controller.state.cube * 2).", "Бот предлагает удвоить ставку до \(controller.state.cube * 2)."))
         }
+        .alert(t("Double offered", "Предложено удвоение"), isPresented: $controller.incomingCubeOffer) {
+            Button(t("Take", "Принять")) { controller.respondToNetworkCubeOffer(accept: true) }
+            Button(t("Drop", "Отказаться"), role: .destructive) { controller.respondToNetworkCubeOffer(accept: false) }
+        } message: {
+            Text(t("Your opponent offers to double the stakes to \(controller.state.cube * 2).", "Соперник предлагает удвоить ставку до \(controller.state.cube * 2)."))
+        }
         .alert(t("Game Over", "Игра окончена"), isPresented: Binding(get: { controller.winnerSeat != nil }, set: { _ in })) {
             Button(t("New Game", "Новая игра")) { controller.newMatch() }
             Button(t("To Menu", "В меню")) { dismiss() }
@@ -377,6 +445,17 @@ struct GameView: View {
         if controller.canOfferDouble(seat: mySeat) {
             Button {
                 controller.offerDouble()
+            } label: {
+                Label(t("Double (cube: \(controller.state.cube))", "Удвоить (куб: \(controller.state.cube))"), systemImage: "cube")
+                    .font(.caption.bold())
+                    .foregroundStyle(night)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Capsule().fill(gold))
+            }
+        } else if controller.canOfferDoubleNetwork(seat: mySeat) {
+            Button {
+                controller.offerDoubleNetwork(seat: mySeat)
             } label: {
                 Label(t("Double (cube: \(controller.state.cube))", "Удвоить (куб: \(controller.state.cube))"), systemImage: "cube")
                     .font(.caption.bold())
