@@ -205,7 +205,7 @@ struct ContentView: View {
         case .short:
             return t("Classic backgammon: opposite directions, hitting sends a blot to the bar, doubling cube included.", "Классические короткие нарды: ходы в разные стороны, бой отправляет шашку на бар, есть куб удвоения.")
         case .tavla:
-            return t("Turkish backgammon: hitting, but a die that can bear a checker off may not be wasted on a smaller move, and a checker that hits can't move again that turn.", "Турецкая тавла: бой есть, но кость, который можно вывести шашку, нельзя потратить на меньший ход; ударившая шашка не ходит повторно в этот ход.")
+            return t("Turkish backgammon: hitting, but a die that can bear a checker off may not be wasted on a smaller move, and a checker that hits can't move again that turn.", "Турецкая тавла: бой есть, но кость, которой можно вывести шашку, нельзя потратить на меньший ход; ударившая шашка не ходит повторно в этот ход.")
         case .plakoto:
             return t("A lone blot gets pinned in place (not sent to the bar) until the pinning checker moves away. Pinning the opponent's head checker wins double at once.", "Одинокая шашка не идёт на бар, а запирается на месте — пока запирающая шашка не уйдёт. Запереть шашку на старте соперника — немедленная двойная победа.")
         case .fevga:
