@@ -451,6 +451,7 @@ struct GameView: View {
     @StateObject private var controller: NardyGameController
     @Environment(\.dismiss) private var dismiss
     @State private var showThemePicker = false
+    @State private var leavingGame = false
 
     private let localSeat: Int
 
@@ -496,9 +497,26 @@ struct GameView: View {
         } message: {
             Text(t("Your opponent offers to double the stakes to \(controller.state.cube * 2).", "Соперник предлагает удвоить ставку до \(controller.state.cube * 2)."))
         }
-        .alert(t("Game Over", "Игра окончена"), isPresented: Binding(get: { controller.winnerSeat != nil }, set: { _ in })) {
-            Button(t("New Game", "Новая игра")) { controller.newMatch() }
-            Button(t("To Menu", "В меню")) { dismiss() }
+        .alert(t("Game Over", "Игра окончена"), isPresented: Binding(get: { controller.winnerSeat != nil && !leavingGame }, set: { _ in })) {
+            Button(t("New Game", "Новая игра")) {
+                if controller.multiplayer == nil {
+                    leavingGame = true
+                    Ads.afterGame {
+                        controller.newMatch()
+                        leavingGame = false
+                    }
+                } else {
+                    controller.newMatch()
+                }
+            }
+            Button(t("To Menu", "В меню")) {
+                if controller.multiplayer == nil {
+                    leavingGame = true
+                    Ads.afterGame { dismiss() }
+                } else {
+                    dismiss()
+                }
+            }
         } message: {
             Text(alertMessage)
         }
@@ -734,6 +752,7 @@ struct PremiumView: View {
 
                 VStack(alignment: .leading, spacing: 12) {
                     featureRow(t("No ads", "Без рекламы"))
+                    featureRow(t("Hints without ads", "Подсказки без рекламы"))
                     featureRow(t("Local multiplayer over Wi-Fi/Bluetooth", "Локальный мультиплеер по Wi-Fi/Bluetooth"))
                     featureRow(t("One-time purchase — yours forever", "Разовая покупка — навсегда"))
                 }

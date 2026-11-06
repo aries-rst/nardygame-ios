@@ -244,8 +244,8 @@ struct DailyPuzzleView: View {
                     Image(systemName: "arrow.uturn.backward.circle.fill").font(.title2)
                 }
                 .disabled(!c.canUndo)
-                Button { c.hint() } label: {
-                    Image(systemName: "lightbulb.circle.fill").font(.title2)
+                Button { Ads.rewardedHint { c.hint() } } label: {
+                    Image(systemName: Ads.isPremium ? "lightbulb.circle.fill" : "play.circle.fill").font(.title2)
                 }
             }
             .foregroundStyle(sand)

@@ -112,6 +112,9 @@ struct ContentView: View {
                     .padding(20)
                 }
             }
+            .safeAreaInset(edge: .bottom) {
+                if !store.isPremium { BannerAdView().frame(maxWidth: .infinity) }
+            }
             .navigationDestination(isPresented: $showGame) {
                 GameView(store: store, variant: options.variant, botLevel: options.botLevel)
             }
@@ -129,6 +132,7 @@ struct ContentView: View {
             }
         }
         .preferredColorScheme(.dark)
+        .onAppear { Ads.start() }
     }
 
     private var languageToggle: some View {
