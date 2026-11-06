@@ -116,6 +116,7 @@ final class DailyPuzzleController: ObservableObject {
 
 struct DailyPuzzleView: View {
     @ObservedObject private var lang = AppLang.shared
+    @ObservedObject private var boardTheme = NardyBoardTheme.shared
     @StateObject private var c = DailyPuzzleController()
     @Environment(\.dismiss) private var dismiss
 
@@ -124,8 +125,6 @@ struct DailyPuzzleView: View {
     private let turquoise = Color(red: 0.17, green: 0.56, blue: 0.55)
     private let sand = Color(red: 0.95, green: 0.90, blue: 0.78)
     private let boardDark = Color(red: 0.10, green: 0.26, blue: 0.27)
-    private let boardLight = Color(red: 0.15, green: 0.35, blue: 0.35)
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: 3), count: 6)
 
     var body: some View {
         NavigationStack {
@@ -222,8 +221,7 @@ struct DailyPuzzleView: View {
     // MARK: - Board
 
     private var playingView: some View {
-        let movable = c.movablePoints
-        return VStack(spacing: 12) {
+        VStack(spacing: 12) {
             if let pz = c.puzzle {
                 Text(t("Turn \(c.turnIndex + 1) / \(pz.turns)", "Ход \(c.turnIndex + 1) / \(pz.turns)"))
                     .font(.caption.bold())
@@ -253,12 +251,12 @@ struct DailyPuzzleView: View {
             .foregroundStyle(sand)
             .padding(.horizontal, 16)
 
-            LazyVGrid(columns: columns, spacing: 3) {
-                ForEach(0..<24, id: \.self) { physical in
-                    puzzleCell(physical, movable: movable)
-                }
-            }
-            .padding(8)
+            NardyBoardCanvas(
+                snapshot: c.boardSnapshot,
+                theme: boardTheme.id,
+                onTapPoint: { physical in c.tapPoint(physical) }
+            )
+            .aspectRatio(NardyBoardGeo.W / NardyBoardGeo.H, contentMode: .fit)
             .background(boardDark.opacity(0.6))
             .clipShape(RoundedRectangle(cornerRadius: 12))
             .overlay(RoundedRectangle(cornerRadius: 12).stroke(gold.opacity(0.4), lineWidth: 1))
@@ -267,38 +265,6 @@ struct DailyPuzzleView: View {
             Spacer()
         }
         .padding(.top, 10)
-    }
-
-    private func puzzleCell(_ physical: Int, movable: Set<Int>) -> some View {
-        let own = NEngine.pathOf(.long, 0, physical)
-        let count = c.state.pos[0][own]
-        let isMovable = movable.contains(physical)
-        let isHint = c.hintFrom == physical
-        return VStack(spacing: 2) {
-            Text("\(physical + 1)")
-                .font(.system(size: 9))
-                .foregroundStyle(sand.opacity(0.4))
-            if count > 0 {
-                ZStack {
-                    Circle().fill(sand).frame(width: 22, height: 22)
-                        .overlay(Circle().stroke(gold.opacity(0.6), lineWidth: 1))
-                    Text("\(count)")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(night)
-                }
-            } else {
-                Spacer().frame(height: 22)
-            }
-        }
-        .frame(maxWidth: .infinity, minHeight: 58)
-        .padding(.vertical, 4)
-        .background((physical / 6) % 2 == 0 ? boardDark : boardLight)
-        .overlay(RoundedRectangle(cornerRadius: 6).stroke(isHint ? .yellow : (isMovable ? turquoise : .clear), lineWidth: 2))
-        .clipShape(RoundedRectangle(cornerRadius: 6))
-        .onTapGesture {
-            guard isMovable else { return }
-            c.tapPoint(physical)
-        }
     }
 }
 
