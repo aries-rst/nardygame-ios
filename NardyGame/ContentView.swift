@@ -36,6 +36,8 @@ struct ContentView: View {
     @State private var showGame = false
     @State private var showPremium = false
     @State private var showLobby = false
+    @State private var showStats = false
+    @State private var showDailyPuzzle = false
 
     private let night = Color(red: 0.05, green: 0.16, blue: 0.20)
     private let gold = Color(red: 0.85, green: 0.62, blue: 0.22)
@@ -88,6 +90,19 @@ struct ContentView: View {
                             }
                         }
 
+                        HStack(spacing: 14) {
+                            Button {
+                                showDailyPuzzle = true
+                            } label: {
+                                secondaryLabel(t("Puzzle of the Day", "Задача дня"), system: "calendar")
+                            }
+                            Button {
+                                showStats = true
+                            } label: {
+                                secondaryLabel(t("Stats", "Статистика"), system: "chart.bar.fill")
+                            }
+                        }
+
                         CrossPromoSection(accent: gold, textColor: sand, cardFill: turquoise.opacity(0.18))
 
                         Text(store.isPremium ? t("Ads disabled · Local multiplayer unlocked", "Реклама отключена · Локальный мультиплеер открыт") : t("Free version · with ads", "Бесплатная версия · с рекламой"))
@@ -105,6 +120,12 @@ struct ContentView: View {
             }
             .sheet(isPresented: $showPremium) {
                 PremiumView(store: store)
+            }
+            .sheet(isPresented: $showStats) {
+                NardyStatsView()
+            }
+            .sheet(isPresented: $showDailyPuzzle) {
+                DailyPuzzleView()
             }
         }
         .preferredColorScheme(.dark)
@@ -242,6 +263,21 @@ struct ContentView: View {
             RoundedRectangle(cornerRadius: 14)
                 .fill(turquoise.opacity(0.18))
                 .overlay(RoundedRectangle(cornerRadius: 14).stroke(gold.opacity(0.5), lineWidth: 1))
+        )
+    }
+
+    private func secondaryLabel(_ text: String, system: String) -> some View {
+        VStack(spacing: 6) {
+            Image(systemName: system).font(.title3)
+            Text(text).font(.caption.bold())
+        }
+        .foregroundStyle(sand)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.white.opacity(0.05))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(sand.opacity(0.15), lineWidth: 1))
         )
     }
 }
