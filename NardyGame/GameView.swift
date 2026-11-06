@@ -1,10 +1,14 @@
 import SwiftUI
+import CryptoKit
+import Security
 
 // MARK: - Network payloads (host-authoritative, same pattern as Durak/Domino's
-// NetworkGameEngine: only the host ever rolls dice or mutates `NGState`; it
-// broadcasts the full state after every change, and a guest sends small move
-// intents back. The doubling cube is vs-bot only in this build — see
-// `NardyGameController.offerDouble()`.)
+// NetworkGameEngine: only the host ever mutates `NGState`; it broadcasts the
+// full state after every change, and a guest sends small move intents back.
+// The doubling cube is vs-bot only in this build — see
+// `NardyGameController.offerDouble()`. Dice VALUES, though, are never picked
+// by either side alone: see `FairDice` below, a 1:1 port of Android's
+// commit-reveal protocol in NetPlay.kt.)
 
 struct NStatePayload: Codable {
     var variant: NVariant
@@ -55,15 +59,61 @@ struct NIntent: Codable {
     var die: Int
 }
 
+struct NDiceCommit: Codable { var n: String; var hash: String }
+struct NDiceSeed: Codable { var n: String; var seed: String }
+
 struct NNetMessage: Codable {
     var deal: NStatePayload? = nil
     var intent: NIntent? = nil
-    var rollRequest: Bool? = nil
     // Cube over network: the mover sends `cubeOffer`; since only the host
     // mutates shared state, a guest's decision travels back as `cubeDecision`
     // for the host to apply (see NardyGameController's network cube methods).
     var cubeOffer: Bool? = nil
     var cubeDecision: Bool? = nil
+    // Fair dice (commit-reveal) — see `FairDice` and `NardyGameController`'s
+    // roll methods for the three-message exchange these carry.
+    var diceCommit: NDiceCommit? = nil
+    var diceSeedAnswer: NDiceSeed? = nil
+    var diceReveal: NDiceSeed? = nil
+}
+
+/// Fair dice for two phones (commit–reveal) — 1:1 port of Android's `FairDice`
+/// object in NetPlay.kt. The roller commits to sha256(seedA); the other side
+/// answers with its own seedB (chosen before it has seen seedA); the roller
+/// then reveals seedA. Neither side can bias the result: the committer can't
+/// change seedA after seeing seedB (the hash already locked it in), and the
+/// answerer picked seedB before it ever saw seedA. dice = f(seedA, seedB, n).
+/// `n` is a per-exchange nonce (a UUID here, rather than Android's monotonic
+/// counter — the two platforms never play cross-protocol, so only uniqueness
+/// within one match matters).
+enum FairDice {
+    static func seed() -> String {
+        var bytes = [UInt8](repeating: 0, count: 16)
+        _ = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
+        return bytes.map { String(format: "%02x", $0) }.joined()
+    }
+
+    static func sha(_ s: String) -> String {
+        let digest = SHA256.hash(data: Data(s.utf8))
+        return digest.map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// Rejection-sampled against 252 (6*42) so every die face stays equally
+    /// likely, exactly like the Kotlin original's `v < 252` guard.
+    static func dice(_ seedA: String, _ seedB: String, _ n: String) -> (Int, Int) {
+        var out: [Int] = []
+        var round = 0
+        while out.count < 2 {
+            let input = "\(seedA):\(seedB):\(n):\(round)"
+            let digest = SHA256.hash(data: Data(input.utf8))
+            for byte in digest {
+                let v = Int(byte)
+                if v < 252 && out.count < 2 { out.append(v % 6 + 1) }
+            }
+            round += 1
+        }
+        return (out[0], out[1])
+    }
 }
 
 /// Drives one match for every variant (long/short/tavla/plakoto/fevga) against
@@ -75,11 +125,18 @@ final class NardyGameController: ObservableObject {
     @Published var incomingCubeOffer = false // network only: the opponent offered, this device's human must respond
     @Published var winnerSeat: Int? = nil
     @Published var winnerPoints: Int = 0
+    @Published var isRollPending = false // network only: fair-dice commit/reveal exchange in flight
 
     let variant: NVariant
     let botLevel: Int
     let multiplayer: MultiplayerManager?
     let localSeat: Int // 0 if single-player or host; 0 or 1 if multiplayer guest resolved to 1
+
+    // Fair-dice exchange state (see `FairDice`): at most one of these is set
+    // at a time, depending on whether this device committed (is rolling) or
+    // is the one answering someone else's commit.
+    private var myRollSeed: (n: String, seed: String)? = nil
+    private var pendingAnswer: (n: String, hash: String, seed: String)? = nil
 
     init(variant: NVariant, botLevel: Int, multiplayer: MultiplayerManager? = nil, localSeat: Int = 0) {
         self.variant = variant
@@ -96,7 +153,7 @@ final class NardyGameController: ObservableObject {
     // MARK: - Turn queries
 
     func canRoll(seat: Int) -> Bool {
-        state.turn == seat && state.dice.isEmpty && winnerSeat == nil && !cubeOfferPending
+        state.turn == seat && state.dice.isEmpty && winnerSeat == nil && !cubeOfferPending && !isRollPending
     }
 
     func canOfferDouble(seat: Int) -> Bool {
@@ -122,23 +179,48 @@ final class NardyGameController: ObservableObject {
         if multiplayer == nil {
             performRoll()
             botTurnIfNeeded()
-        } else if localSeat == 0 {
-            guard seat == 0 else { return }
-            performRoll()
-            broadcast()
         } else {
-            multiplayer?.send(NNetMessage(rollRequest: true))
+            guard seat == localSeat else { return }
+            beginFairRoll()
         }
     }
 
     private func performRoll() {
         let a = NEngine.fairDie(); let b = NEngine.fairDie()
-        if multiplayer == nil { NardyStats.shared.recordRoll(isBot: false, a, b) }
+        NardyStats.shared.recordRoll(isBot: false, a, b)
+        applyRolledDice(a, b)
+    }
+
+    private func applyRolledDice(_ a: Int, _ b: Int) {
         state = NEngine.setDice(state, a, b)
         if NEngine.legalSteps(state).isEmpty {
             state = NEngine.endTurn(state)
             checkWinner()
         }
+    }
+
+    // MARK: - Fair dice over network (see `FairDice`)
+
+    /// Kick off a commit-reveal exchange for this device's own roll. Whoever
+    /// is NOT rolling answers automatically from `setupReceiver`'s `diceCommit`
+    /// branch below.
+    private func beginFairRoll() {
+        guard !isRollPending else { return }
+        isRollPending = true
+        let seedA = FairDice.seed()
+        let n = UUID().uuidString
+        myRollSeed = (n, seedA)
+        multiplayer?.send(NNetMessage(diceCommit: NDiceCommit(n: n, hash: FairDice.sha(seedA))))
+    }
+
+    /// Only the host ever mutates the shared `state` (same invariant as every
+    /// other mutation in this controller) — whichever device finishes the
+    /// commit-reveal exchange computes the identical (a, b) locally, but only
+    /// the host applies it and broadcasts; the guest just waits for that.
+    private func applyFairRoll(_ a: Int, _ b: Int) {
+        guard localSeat == 0 else { return }
+        applyRolledDice(a, b)
+        broadcast()
     }
 
     // MARK: - Doubling cube (vs bot only)
@@ -289,6 +371,9 @@ final class NardyGameController: ObservableObject {
         winnerPoints = 0
         cubeOfferPending = false
         incomingCubeOffer = false
+        isRollPending = false
+        myRollSeed = nil
+        pendingAnswer = nil
         if multiplayer != nil && localSeat == 0 { broadcast() }
     }
 
@@ -318,12 +403,31 @@ final class NardyGameController: ObservableObject {
                     }
                 } else if let intent = msg.intent, self.localSeat == 0 {
                     self.hostApplyIntent(intent)
-                } else if msg.rollRequest == true, self.localSeat == 0 {
-                    self.hostApplyRollRequest()
                 } else if msg.cubeOffer == true {
                     self.incomingCubeOffer = true
                 } else if let decision = msg.cubeDecision, self.localSeat == 0 {
                     self.applyCubeDecision(accept: decision, offererSeat: 0)
+                } else if let commit = msg.diceCommit {
+                    // The other device is rolling; answer with our own seed,
+                    // chosen before we've seen theirs.
+                    let seedB = FairDice.seed()
+                    self.pendingAnswer = (commit.n, commit.hash, seedB)
+                    self.multiplayer?.send(NNetMessage(diceSeedAnswer: NDiceSeed(n: commit.n, seed: seedB)))
+                } else if let answer = msg.diceSeedAnswer, let mine = self.myRollSeed, mine.n == answer.n {
+                    // We're the roller: now that both seeds exist, reveal ours
+                    // and compute the (now-fixed) result.
+                    self.myRollSeed = nil
+                    self.isRollPending = false
+                    self.multiplayer?.send(NNetMessage(diceReveal: NDiceSeed(n: mine.n, seed: mine.seed)))
+                    let (a, b) = FairDice.dice(mine.seed, answer.seed, mine.n)
+                    self.applyFairRoll(a, b)
+                } else if let reveal = msg.diceReveal, let pending = self.pendingAnswer, pending.n == reveal.n {
+                    // We were the answerer: verify the commitment before
+                    // trusting the revealed seed, then compute the same result.
+                    self.pendingAnswer = nil
+                    guard FairDice.sha(reveal.seed) == pending.hash else { return }
+                    let (a, b) = FairDice.dice(reveal.seed, pending.seed, reveal.n)
+                    self.applyFairRoll(a, b)
                 }
             }
         }
@@ -334,12 +438,6 @@ final class NardyGameController: ObservableObject {
         let candidates = NEngine.legalSteps(state).filter { $0.from == intent.from && $0.die == intent.die }
         guard let chosen = candidates.first else { return }
         applyAndContinue(chosen.state)
-        broadcast()
-    }
-
-    private func hostApplyRollRequest() {
-        guard state.turn == 1, state.dice.isEmpty, winnerSeat == nil else { return }
-        performRoll()
         broadcast()
     }
 }
@@ -509,6 +607,10 @@ struct GameView: View {
                         .padding(.vertical, 8)
                         .background(Capsule().fill(turquoise))
                 }
+            } else if controller.isRollPending {
+                Label(t("Fair roll…", "Честный бросок…"), systemImage: "checkmark.shield")
+                    .font(.caption.bold())
+                    .foregroundStyle(turquoise)
             }
             Spacer()
             if controller.state.bar[0] > 0 || controller.state.bar[1] > 0 {
