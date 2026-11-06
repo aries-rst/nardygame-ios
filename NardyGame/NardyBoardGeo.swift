@@ -97,7 +97,7 @@ enum NardyBoardBg {
     }
 
     static func paint(_ context: GraphicsContext, pal: NBoardPal) {
-        let B = NardyBoardGeo
+        typealias B = NardyBoardGeo
         var ctx = context
         // frame
         let frameRect = RoundedRectangle(cornerRadius: 18).path(in: CGRect(x: 0, y: 0, width: B.W, height: B.H))
@@ -171,7 +171,7 @@ enum NardyBoardBg {
     }
 
     private static func point(_ context: GraphicsContext, pal: NBoardPal, b: Int) {
-        let B = NardyBoardGeo
+        typealias B = NardyBoardGeo
         let x = B.x(b); let top = B.isTop(b); let c = B.col(b)
         let yb: CGFloat = top ? 12 : B.H - 12
         let yt: CGFloat = top ? 12 + B.PL : B.H - 12 - B.PL
