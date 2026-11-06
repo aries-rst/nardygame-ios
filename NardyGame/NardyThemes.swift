@@ -168,38 +168,39 @@ enum NardyThemes {
         case "beech":
             return NBoardPal(frame: Color(hex: 0xFF6B3F1D), felt: Color(hex: 0xFFE2B98A), ptA: Color(hex: 0xFF2B1A10), ptB: Color(hex: 0xFFF4E6C8), ornStyle: "none", trayA: 0.28)
         case "walnut":
-            return NBoardPal(frame: Color(hex: 0xFF3A2414), felt: Color(hex: 0xFFB88452), ptA: Color(hex: 0xFF1C120C), ptB: Color(hex: 0xFFEFE0BF), pointStyle: "inlay",
-                hinge: Color(hex: 0xFFD4A84A), orn: Color(hex: 0xFF5A3518), ornAlpha: 0.95, ornStyle: "rosette", trayA: 0.28)
+            return NBoardPal(frame: Color(hex: 0xFF3A2414), felt: Color(hex: 0xFFB88452), ptA: Color(hex: 0xFF1C120C), ptB: Color(hex: 0xFFEFE0BF),
+                orn: Color(hex: 0xFF5A3518), ornAlpha: 0.95, hinge: Color(hex: 0xFFD4A84A), ornStyle: "rosette", pointStyle: "inlay", trayA: 0.28)
         case "dragon":
             return NBoardPal(frame: Color(hex: 0xFF5A3418), felt: Color(hex: 0xFFD9A564), ptA: Color(hex: 0xFF1D120B), ptB: Color(hex: 0xFFF0DFC0), orn: Color(hex: 0xFF3E200C), ornStyle: "dragon", mirrorDecor: true, trayA: 0.28)
         case "pyro":
-            return NBoardPal(frame: Color(hex: 0xFF7A4A22), felt: Color(hex: 0xFFE6C191), ptA: Color(hex: 0xFF3A1E0C), ptB: Color(hex: 0xFF3A1E0C), pointStyle: "outlined",
-                burn: Color(hex: 0xFF3A1E0C), hinge: Color(hex: 0xFFB8893A), orn: Color(hex: 0xFF3A1E0C), ornStyle: "arabesque", trayA: 0.28)
+            return NBoardPal(frame: Color(hex: 0xFF7A4A22), felt: Color(hex: 0xFFE6C191), ptA: Color(hex: 0xFF3A1E0C), ptB: Color(hex: 0xFF3A1E0C), orn: Color(hex: 0xFF3A1E0C),
+                hinge: Color(hex: 0xFFB8893A), ornStyle: "arabesque", pointStyle: "outlined", burn: Color(hex: 0xFF3A1E0C), trayA: 0.28)
         case "leather":
             return NBoardPal(frame: Color(hex: 0xFF4B2A1A), felt: Color(hex: 0xFFE9DCC0), ptA: Color(hex: 0xFF6B1F1F), ptB: Color(hex: 0xFF2E2A26), grain: 0.35,
-                hinge: Color(hex: 0xFFC0C0C0), ornStyle: "none", trayA: 0.28, feltGrain: 0, stitch: Color(hex: 0xFFD9B47A),
-                w1: Color(hex: 0xFFFFFBF0), w2: Color(hex: 0xFFEFE4CC), w3: Color(hex: 0xFFB8A27C), b1: Color(hex: 0xFFA8424A), b2: Color(hex: 0xFF6B1F1F), b3: Color(hex: 0xFF2A0808))
+                w1: Color(hex: 0xFFFFFBF0), w2: Color(hex: 0xFFEFE4CC), w3: Color(hex: 0xFFB8A27C), b1: Color(hex: 0xFFA8424A), b2: Color(hex: 0xFF6B1F1F), b3: Color(hex: 0xFF2A0808),
+                hinge: Color(hex: 0xFFC0C0C0), ornStyle: "none", feltGrain: 0, stitch: Color(hex: 0xFFD9B47A), trayA: 0.28)
         case "knot":
-            return NBoardPal(frame: Color(hex: 0xFF2E1D12), felt: Color(hex: 0xFFA8713F), ptA: Color(hex: 0xFF1A100A), ptB: Color(hex: 0xFFECD9B2), hinge: Color(hex: 0xFFB08A3A),
-                orn: Color(hex: 0xFF4A2810), ornStyle: "knot", trayA: 0.28)
+            return NBoardPal(frame: Color(hex: 0xFF2E1D12), felt: Color(hex: 0xFFA8713F), ptA: Color(hex: 0xFF1A100A), ptB: Color(hex: 0xFFECD9B2),
+                orn: Color(hex: 0xFF4A2810), hinge: Color(hex: 0xFFB08A3A), ornStyle: "knot", trayA: 0.28)
         case "mahogany":
-            return NBoardPal(frame: Color(hex: 0xFF4A1A12), felt: Color(hex: 0xFF8E3B22), ptA: Color(hex: 0xFFF0DCB4), ptB: Color(hex: 0xFF1A0F0A), pointStyle: "arrow",
-                inlay: Color(hex: 0xFFEFDCB4), hinge: Color(hex: 0xFFD4A84A), ornStyle: "rhombus", trayA: 0.28)
+            return NBoardPal(frame: Color(hex: 0xFF4A1A12), felt: Color(hex: 0xFF8E3B22), ptA: Color(hex: 0xFFF0DCB4), ptB: Color(hex: 0xFF1A0F0A),
+                hinge: Color(hex: 0xFFD4A84A), ornStyle: "rhombus", pointStyle: "arrow", inlay: Color(hex: 0xFFEFDCB4), trayA: 0.28)
         case "ebony":
             return NBoardPal(frame: Color(hex: 0xFF0E0C0B), frameIn: Color(hex: 0xFF3A3020), felt: Color(hex: 0xFF1A1614), ptA: Color(hex: 0xFFEFE6D2), ptB: Color(hex: 0xFFC9A34A), grain: 0.15,
-                hinge: Color(hex: 0xFFC9A34A), orn: Color(hex: 0xFFC9A34A), ornAlpha: 0.95, ornStyle: "rosette", trayA: 0.28, feltGrain: 0.15,
-                rim: Color(hex: 0xFFC9A34A), feltBorder: Color(hex: 0xFFC9A34A), ring: Color(hex: 0xFFC9A34A),
-                w1: Color(hex: 0xFFFFFAF0), w2: Color(hex: 0xFFEFE6D2), w3: Color(hex: 0xFFB8AB8A), b1: Color(hex: 0xFF4A4440), b2: Color(hex: 0xFF1C1917), b3: Color(hex: 0xFF000000))
+                orn: Color(hex: 0xFFC9A34A), ornAlpha: 0.95,
+                w1: Color(hex: 0xFFFFFAF0), w2: Color(hex: 0xFFEFE6D2), w3: Color(hex: 0xFFB8AB8A), b1: Color(hex: 0xFF4A4440), b2: Color(hex: 0xFF1C1917), b3: Color(hex: 0xFF000000),
+                hinge: Color(hex: 0xFFC9A34A), ornStyle: "rosette", feltGrain: 0.15,
+                rim: Color(hex: 0xFFC9A34A), feltBorder: Color(hex: 0xFFC9A34A), ring: Color(hex: 0xFFC9A34A), trayA: 0.28)
         case "tournament":
             return NBoardPal(frame: Color(hex: 0xFF2A1A12), felt: Color(hex: 0xFF1F5A3A), ptA: Color(hex: 0xFFB3271C), ptB: Color(hex: 0xFFEFE6D2), grain: 0.3,
-                hinge: Color(hex: 0xFFC0C0C0), ornStyle: "none", trayA: 0.28, feltGrain: 0, stitch: Color(hex: 0xFF8A6A4A))
+                hinge: Color(hex: 0xFFC0C0C0), ornStyle: "none", feltGrain: 0, stitch: Color(hex: 0xFF8A6A4A), trayA: 0.28)
         case "khatam":
-            return NBoardPal(frame: Color(hex: 0xFF2A1A10), felt: Color(hex: 0xFFC9A36A), ptA: Color(hex: 0xFF2A1A12), ptB: Color(hex: 0xFFEFE0C0), grain: 0, pointStyle: "inlay",
-                hinge: Color(hex: 0xFFD4A84A), ornStyle: "starMed", trayA: 0.45, feltGrain: 0.55, khatam: true)
+            return NBoardPal(frame: Color(hex: 0xFF2A1A10), felt: Color(hex: 0xFFC9A36A), ptA: Color(hex: 0xFF2A1A12), ptB: Color(hex: 0xFFEFE0C0), grain: 0,
+                hinge: Color(hex: 0xFFD4A84A), ornStyle: "starMed", pointStyle: "inlay", feltGrain: 0.55, khatam: true, trayA: 0.45)
         case "carve":
-            return NBoardPal(frame: Color(hex: 0xFF5A3418), felt: Color(hex: 0xFFE8D6B0), ptA: Color(hex: 0xFF1F4F8A), ptB: Color(hex: 0xFFC99A3C),
-                hinge: Color(hex: 0xFFC9A24A), orn: Color(hex: 0xFF8A5A2A), ornStyle: "islimi", trayA: 0.28, feltGrain: 0.3,
-                w1: Color(hex: 0xFFFFFFFF), w2: Color(hex: 0xFFF1EBDC), w3: Color(hex: 0xFFB8AE92), b1: Color(hex: 0xFF4F7FD0), b2: Color(hex: 0xFF1A3F8A), b3: Color(hex: 0xFF0B1F4A))
+            return NBoardPal(frame: Color(hex: 0xFF5A3418), felt: Color(hex: 0xFFE8D6B0), ptA: Color(hex: 0xFF1F4F8A), ptB: Color(hex: 0xFFC99A3C), orn: Color(hex: 0xFF8A5A2A),
+                w1: Color(hex: 0xFFFFFFFF), w2: Color(hex: 0xFFF1EBDC), w3: Color(hex: 0xFFB8AE92), b1: Color(hex: 0xFF4F7FD0), b2: Color(hex: 0xFF1A3F8A), b3: Color(hex: 0xFF0B1F4A),
+                hinge: Color(hex: 0xFFC9A24A), ornStyle: "islimi", feltGrain: 0.3, trayA: 0.28)
         default: // "wood"
             return NBoardPal(frame: Color(hex: 0xFF5A3216), frameIn: Color(hex: 0xFF2B170A), felt: Color(hex: 0xFFD9A96A), ptA: Color(hex: 0xFF2C1A10), ptB: Color(hex: 0xFFF2E2C0), grain: 0.9, orn: Color(hex: 0xFF6B3D1A), ornAlpha: 0.22,
                 w1: Color(hex: 0xFFFFFDF6), w2: Color(hex: 0xFFEFE3C8), w3: Color(hex: 0xFFBBA57A), b1: Color(hex: 0xFF6A5446), b2: Color(hex: 0xFF2C1F17), b3: Color(hex: 0xFF0B0705),
